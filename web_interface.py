@@ -2,6 +2,7 @@ from ollama import  generate
 import gradio as gr
 import time
 import re
+import os
 
 def get_llm_response(input_text, task='revision'):
     """
@@ -39,12 +40,22 @@ def get_llm_response(input_text, task='revision'):
     """
     response_prompt = "あなたは専門的な日本法律顧問です。質問されたことに対して専門的な法律の見地から日本語で答えてください。重複内容を出力しないでください"
 
-    model_name = 'llama3.3_jp_keiyaku_1221_Q4KM'
+    model_name = 'llama3.3'
 
-    generation_params = {
+    revision_params = {
+        #"do_sample": True,
+        "temperature": 0.8,
+        "top_p": 0.9,
+        "top_k": 40,
+        "num_predict": 1024,
+        "num_ctx": 2048,
+        "repeat_penalty": 1.2,
+    }
+
+    response_params = {
         #"do_sample": True,
         "temperature": 0.6,
-        "top_p": 0.9,
+        "top_p": 0.8,
         "top_k": 40,
         "num_predict": 1024,
         "num_ctx": 2048,
@@ -54,7 +65,7 @@ def get_llm_response(input_text, task='revision'):
     if task == 'revision':
 
         system_prompt = revision_prompt
-
+        generation_params = revision_params
         res = generate(
             model=model_name,
             prompt=input_text,
@@ -64,7 +75,7 @@ def get_llm_response(input_text, task='revision'):
     elif task == 'response':
 
         system_prompt = response_prompt
-
+        generation_params = response_params
         res = generate(
             model=model_name,
             prompt=input_text,
@@ -75,12 +86,24 @@ def get_llm_response(input_text, task='revision'):
         print("Invalid task. Please choose either 'revision' or 'response'.")
 
     response = res['response']
+
+    current_dir = os.path.dirname(os.path.realpath(__file__))
+    data_path = current_dir + '/data'
+    if not os.path.exists(data_path):
+        os.makedirs(data_path)
+    date_today = time.strftime("%Y%m%d")
+    output_file = data_path + '/record_' + date_today + '.txt'
+    with open(output_file, 'a', encoding='utf-8-sig') as f:
+        f.write(f"Task: {task}\n")
+        f.write(f"Input text: {input_text}\n")
+        f.write(f"Response: {response}\n")
+        f.write('-'*50 + '\n')
+
     for i in range(len(response)):
         yield response[:i+1]
         time.sleep(0.01)
 
     # return res['response']
-
 
 with gr.Blocks(theme=gr.themes.Soft()) as demo:
     # タイトル
